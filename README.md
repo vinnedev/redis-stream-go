@@ -51,6 +51,8 @@ docker run --rm -p 6379:6379 redis:7-alpine
 ### Run the service
 
 ```bash
+cp .env.example .env
+# edit .env as needed
 go run ./cmd/main.go
 ```
 
@@ -188,6 +190,22 @@ The service exports 8 Prometheus metrics:
 | `/health` | `GET` | Returns `200` with `{"status":"ok"}` |
 | `/ready` | `GET` | Pings Redis and returns `200` with `{"status":"ready"}` or `503` if Redis is unavailable |
 | `/metrics` | `GET` | Prometheus scrape endpoint |
+
+### Grafana
+
+The full observability stack is available via Docker Compose:
+
+```bash
+docker compose up -d
+```
+
+| Service | URL | Credentials |
+|---|---|---|
+| Grafana | http://localhost:3000 | `admin` / `admin` |
+| Prometheus | http://localhost:9090 | — |
+| App metrics | http://localhost:8080/metrics | — |
+
+Grafana starts with a pre-provisioned `redis-stream` dashboard sourced from `deploy/grafana/dashboards/redis-stream.json`.
 
 ### Logging and Tracing
 

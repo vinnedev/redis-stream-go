@@ -1,0 +1,3 @@
+// Package integration contains end-to-end tests that require Docker.
+// Run with: go test -tags integration ./tests/integration/...
+package integration
