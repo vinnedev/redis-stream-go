@@ -25,7 +25,15 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
   "id": null,
-  "links": [],
+  "links": [
+    {
+      "title": "Error Deep Dive \u2192",
+      "type": "dashboard",
+      "url": "/d/redis-stream-errors",
+      "tooltip": "Redis Stream Go \u2014 Errors",
+      "targetBlank": false
+    }
+  ],
   "liveNow": false,
   "panels": [
     {
@@ -2261,6 +2269,54 @@
       ],
       "title": "Evicted Keys/s",
       "type": "timeseries"
+    },
+    {
+      "id": 100,
+      "type": "row",
+      "title": "Logs",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 62,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 101,
+      "type": "logs",
+      "title": "App Logs",
+      "gridPos": {
+        "x": 0,
+        "y": 63,
+        "w": 24,
+        "h": 12
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "{service=\"app\"}",
+          "legendFormat": ""
+        }
+      ]
     }
   ],
   "refresh": "10s",
@@ -2299,7 +2355,7 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Redis Stream Go \u2014 Enterprise",
+  "title": "Redis Stream Go \u2014 Overview",
   "uid": "redis-stream-go-enterprise",
   "version": 1,
   "weekStart": ""

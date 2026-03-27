@@ -25,6 +25,8 @@ services:
     command: redis-server --appendonly yes
     volumes:
       - redis-data:/data
+    ports:
+      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -63,6 +65,27 @@ services:
     networks:
       - stream-net
 
+  loki:
+    image: grafana/loki:latest
+    restart: unless-stopped
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "3100:3100"
+    networks:
+      - stream-net
+
+  promtail:
+    image: grafana/promtail:latest
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./deploy/promtail/promtail.yml:/etc/promtail/config.yml:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    networks:
+      - stream-net
+
   grafana:
     image: grafana/grafana:latest
     restart: unless-stopped
@@ -83,6 +106,7 @@ services:
       - "3000:3000"
     depends_on:
       - prometheus
+      - loki
     networks:
       - stream-net
 

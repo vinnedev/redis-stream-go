@@ -1,6 +1,6 @@
 # redis-stream-go
 
-Production-ready Go service for publishing to and consuming from Redis Streams with retries, DLQ, circuit breaker, enterprise observability, and Grafana alerting.
+Production-ready Go service for publishing to and consuming from Redis Streams with retries, DLQ, circuit breaker, observability, and Grafana alerting.
 
 ## Architecture Overview
 
@@ -13,6 +13,7 @@ flowchart LR
     H -->|error| R[Backoff Retry]
     R -->|retries exhausted| D[(Dead Letter Stream)]
     W -->|XLEN poll 15s| M[stream_consumer_lag]
+    W -->|JSON logs| L[Loki]
 ```
 
 The service creates a Redis consumer group, publishes messages with circuit breaker protection, processes messages concurrently, acknowledges successful deliveries, and moves failed messages to a dead-letter stream.
@@ -25,8 +26,9 @@ The service creates a Redis consumer group, publishes messages with circuit brea
 - Dead-letter queue for messages that exhaust retries
 - Circuit breaker around publish operations (state exported as metric)
 - 11 Prometheus metrics including consumer lag and retry rate
-- Grafana enterprise dashboard with SLO panels, p99.9 latency, and consumer lag
+- Two Grafana dashboards in the `Redis Stream` folder with log panels via Loki
 - Grafana unified alerting with 7 pre-provisioned alert rules
+- Log aggregation via Loki + Promtail (JSON structured logs)
 - OpenTelemetry tracing and Zap structured logging
 - HTTP health, readiness, and metrics endpoints
 - `.env` file support — loaded automatically at startup
@@ -55,7 +57,7 @@ cp .env.example .env
 go run ./cmd/main.go
 ```
 
-### Run full stack (app + Redis + Prometheus + Grafana)
+### Run full stack
 
 ```bash
 docker compose up -d
@@ -65,13 +67,20 @@ docker compose up -d
 |---|---|---|
 | App metrics | http://localhost:8080/metrics | — |
 | Prometheus | http://localhost:9090 | — |
+| Loki | http://localhost:3100 | — |
 | Grafana | http://localhost:3000 | `admin` / `admin` |
+
+### Load test
+
+```bash
+go run ./cmd/loadtest/main.go
+```
+
+Runs 8 sequential scenarios (warm-up → high throughput → error spike → DLQ flood → consumer lag → high latency → recovery → drain) to exercise every panel and trigger every alert.
 
 ## Configuration
 
-On startup the service loads `.env` from the working directory (if present), then reads environment variables. Existing OS env vars always take precedence over `.env` values. Duration values use Go duration syntax such as `100ms`, `2s`, or `30s`.
-
-Copy `.env.example` to `.env` and adjust as needed:
+On startup the service loads `.env` from the working directory (if present), then reads environment variables. Existing OS env vars always take precedence. Duration values use Go duration syntax (`100ms`, `2s`, `30s`).
 
 ```bash
 cp .env.example .env
@@ -103,7 +112,7 @@ cp .env.example .env
 | `HTTP_ADDR` | `:8080` | HTTP server bind address |
 | `LOG_LEVEL` | `info` | Log level (`debug`, `info`, `warn`, `error`) |
 | `LOG_JSON` | `true` | JSON log format when `true` |
-| `GF_ALERT_WEBHOOK_URL` | `http://localhost:9999/alerts` | Grafana alert webhook destination |
+| `GF_ALERT_WEBHOOK_URL` | `http://alert-webhook.invalid/alerts` | Grafana alert webhook destination |
 
 ## How It Works
 
@@ -199,18 +208,38 @@ The service exports 11 Prometheus metrics:
 | `/ready` | `GET` | Pings Redis — `200 {"status":"ready"}` or `503` if unavailable |
 | `/metrics` | `GET` | Prometheus scrape endpoint |
 
-### Grafana Dashboard
+### Grafana Dashboards
 
-The enterprise dashboard (`deploy/grafana/dashboards/redis-stream.json`) is auto-provisioned on startup. Panels are arranged in priority order:
+Both dashboards live in the `Redis Stream` folder and link to each other.
 
-| Priority | Row | Panels |
-|---|---|---|
-| 1 | Service SLOs | Success Rate %, Error Rate %, DLQ Rate %, Consumer Lag, P99 Latency, Circuit Breaker state |
-| 2 | Throughput | Published vs Consumed/s, Consumer Lag trend, Retry Rate |
-| 3 | Latency | Processing and Publish percentiles: p50 / p95 / p99 / p99.9 |
-| 4 | Errors & Reliability | Error rate breakdown, DLQ rate, Circuit Breaker state over time |
-| 5 | Worker Saturation | Active workers, cumulative counters |
-| 6 | Redis Infrastructure | Memory, connected clients, commands/s, keyspace hit rate, network I/O |
+**Redis Stream Go — Overview** (`redis-stream.json`)
+
+Panels in priority order:
+
+| Row | Panels |
+|---|---|
+| Service SLOs | Success Rate %, Error Rate %, DLQ Rate %, Consumer Lag, P99 Latency, Circuit Breaker |
+| Throughput | Published vs Consumed/s, Consumer Lag trend, Retry Rate |
+| Latency | p50 / p95 / p99 / p99.9 for processing and publish |
+| Errors & Reliability | Error rate breakdown, DLQ rate, Circuit Breaker over time |
+| Worker Saturation | Active workers, cumulative counters |
+| Redis Infrastructure | Memory, clients, commands/s, keyspace hit rate, network I/O |
+| Logs | All app container logs via Loki |
+
+**Redis Stream Go — Errors** (`redis-stream-errors.json`)
+
+Drill-down dashboard for debugging:
+
+| Row | Panels |
+|---|---|
+| Error Summary | Consume Error %, Publish Error %, DLQ Rate, Retry Rate |
+| Error Rate Over Time | Consume, publish, dead-letter, retry rates — distinct colors |
+| Error Breakdown | Accumulated totals, error-to-success ratio, retry exhaustion |
+| Latency During Errors | Processing and publish percentiles |
+| Circuit Breaker | State over time, current state, active workers |
+| Consumer Lag | Lag trend and current value |
+| Logs | Error & warning logs filtered by `level=~"error\|warn"` |
+| Logs | Worker retry events (`handler error`) and DLQ events (`dead letter`) |
 
 ### Grafana Alerting
 
@@ -226,12 +255,18 @@ The enterprise dashboard (`deploy/grafana/dashboards/redis-stream.json`) is auto
 | Consumer Lag High | warning | `stream_consumer_lag > 1000` | 2m |
 | P99 Latency High | warning | p99 processing latency > 1s | 3m |
 
-Notifications are routed to a webhook. `docker compose` now supplies a safe placeholder by default, but you should set `GF_ALERT_WEBHOOK_URL` in `.env` to point to Slack, PagerDuty, or any compatible receiver.
+Set `GF_ALERT_WEBHOOK_URL` in `.env` to route notifications to Slack, PagerDuty, or any webhook receiver.
 
-### Logging and Tracing
+### Logs
 
-- Logging uses Zap, defaults to JSON format
-- Tracing uses OpenTelemetry with the stdout exporter (service name: `redis-stream-go`)
+Container logs are collected by Promtail, shipped to Loki, and surfaced in the Grafana dashboards. The app emits structured JSON logs via Zap, parsed by Promtail with fields `level`, `logger`, and `msg` as labels.
+
+- Overview dashboard shows all app logs
+- Errors dashboard filters to `level=error|warn` and DLQ/retry events
+
+### Tracing
+
+OpenTelemetry with the stdout exporter (service name: `redis-stream-go`).
 
 ## Testing
 
@@ -251,38 +286,64 @@ go test -tags integration ./tests/integration/... -v
 
 Uses `testcontainers-go` — Docker required.
 
+### Load test
+
+```bash
+# requires docker compose up -d to be running
+go run ./cmd/loadtest/main.go
+```
+
+| Scenario | Rate | Behavior |
+|---|---|---|
+| warm-up | 10/s | Baseline — verify throughput panels |
+| high-throughput | 100/s | Spike — watch worker saturation |
+| error-spike | 20/s + 50% errors | Triggers High Consume Error Rate alert |
+| dlq-flood | 10/s + 100% fail | Triggers DLQ Spike alert |
+| consumer-lag | 60/s + 150ms delay | Consumer lag grows past 1000 |
+| high-latency | 5/s + 2s delay | Triggers P99 Latency High alert |
+| recovery | 10/s | Metrics recover, alerts resolve |
+| drain | 0/s | Consumer lag drains to zero |
+
 ## Project Structure
 
 ```text
 redis-stream-go/
-├── cmd/main.go                                    # Entry point — loads .env, wires components
+├── cmd/
+│   ├── main.go                                        # Entry point — loads .env, wires components
+│   └── loadtest/main.go                               # Load test — 8 scenarios, exercises all panels
 ├── internal/
-│   ├── config/config.go                           # Env-based configuration
-│   ├── health/server.go                           # HTTP health/metrics server
-│   ├── logger/logger.go                           # Zap structured logging
+│   ├── config/
+│   │   ├── config.go                                  # Env-based configuration
+│   │   └── dotenv.go                                  # .env file loader
+│   ├── health/server.go                               # HTTP health/metrics server
+│   ├── logger/logger.go                               # Zap structured logging
 │   ├── observability/
-│   │   ├── metrics.go                             # 11 Prometheus metrics
-│   │   └── tracer.go                              # OpenTelemetry tracer
+│   │   ├── metrics.go                                 # 11 Prometheus metrics
+│   │   └── tracer.go                                  # OpenTelemetry tracer
 │   └── stream/
-│       ├── client.go                              # Redis client factory
-│       ├── message.go                             # Message struct + Handler type
-│       ├── publisher.go                           # Publisher with circuit breaker
-│       └── worker.go                              # Consumer with retry, DLQ, lag poller
+│       ├── client.go                                  # Redis client factory
+│       ├── message.go                                 # Message struct + Handler type
+│       ├── publisher.go                               # Publisher with circuit breaker
+│       └── worker.go                                  # Consumer with retry, DLQ, lag poller
 ├── pkg/
-│   ├── backoff/backoff.go                         # Exponential backoff with jitter
-│   └── circuitbreaker/breaker.go                  # Circuit breaker (Closed/Open/Half-Open)
-├── third_party/godotenv/godotenv.go               # Bundled .env loader (no external dep)
+│   ├── backoff/backoff.go                             # Exponential backoff with jitter
+│   └── circuitbreaker/breaker.go                      # Circuit breaker (Closed/Open/Half-Open)
 ├── deploy/
-│   ├── prometheus/prometheus.yml                  # Prometheus scrape config
+│   ├── prometheus/prometheus.yml                      # Prometheus scrape config
+│   ├── promtail/promtail.yml                          # Log collection from Docker containers
 │   └── grafana/
-│       ├── dashboards/redis-stream.json           # Enterprise Grafana dashboard
+│       ├── dashboards/
+│       │   ├── redis-stream.json                      # Overview dashboard (folder: Redis Stream)
+│       │   └── redis-stream-errors.json               # Error drill-down dashboard
 │       └── provisioning/
-│           ├── datasources/prometheus.yml
-│           ├── dashboards/dashboard.yml
+│           ├── datasources/
+│           │   ├── prometheus.yml                     # Prometheus datasource
+│           │   └── loki.yml                           # Loki datasource
+│           ├── dashboards/dashboard.yml               # Dashboard provider (folder: Redis Stream)
 │           └── alerting/
-│               ├── alerts.yaml                    # 7 alert rules
-│               ├── contact-points.yaml            # Webhook contact point
-│               └── notification-policies.yaml     # Routing policy
+│               ├── alerts.yaml                        # 7 alert rules
+│               ├── contact-points.yaml                # Webhook contact point
+│               └── notification-policies.yaml         # Routing policy
 ├── tests/
 │   ├── integration/stream_test.go
 │   └── unit/
@@ -290,6 +351,6 @@ redis-stream-go/
 │       ├── circuitbreaker_test.go
 │       ├── publisher_test.go
 │       └── worker_test.go
-├── .env.example                                   # All env vars with defaults
-└── docker-compose.yml                             # Full observability stack
+├── .env.example                                       # All env vars with defaults
+└── docker-compose.yml                                 # Full stack: app, Redis, Prometheus, Loki, Promtail, Grafana
 ```

@@ -29,6 +29,7 @@ groups:
             model:
               type: threshold
               refId: C
+              expression: "A"
               conditions:
                 - evaluator:
                     type: lt
@@ -70,6 +71,7 @@ groups:
             model:
               type: threshold
               refId: C
+              expression: "A"
               conditions:
                 - evaluator:
                     type: gt
@@ -111,6 +113,7 @@ groups:
             model:
               type: threshold
               refId: C
+              expression: "A"
               conditions:
                 - evaluator:
                     type: gt
@@ -152,6 +155,7 @@ groups:
             model:
               type: threshold
               refId: C
+              expression: "A"
               conditions:
                 - evaluator:
                     type: gt
@@ -193,6 +197,7 @@ groups:
             model:
               type: threshold
               refId: C
+              expression: "A"
               conditions:
                 - evaluator:
                     type: gt
@@ -234,6 +239,7 @@ groups:
             model:
               type: threshold
               refId: C
+              expression: "A"
               conditions:
                 - evaluator:
                     type: lt
@@ -275,6 +281,7 @@ groups:
             model:
               type: threshold
               refId: C
+              expression: "A"
               conditions:
                 - evaluator:
                     type: gt
