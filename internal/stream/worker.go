@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"redis-stream-go/internal/config"
@@ -54,6 +55,24 @@ func (w *Worker) Start(ctx context.Context) {
 
 func (w *Worker) Wait() {
 	w.wg.Wait()
+}
+
+func (w *Worker) StartLagPoller(ctx context.Context, lag prometheus.Gauge) {
+	go func() {
+		ticker := time.NewTicker(15 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				n, err := w.rdb.XLen(ctx, w.cfg.Name).Result()
+				if err == nil {
+					lag.Set(float64(n))
+				}
+			}
+		}
+	}()
 }
 
 func (w *Worker) run(ctx context.Context, id int) {
@@ -118,6 +137,7 @@ func (w *Worker) process(ctx context.Context, log *zap.Logger, msg Message) {
 		w.metrics.ConsumeErrors.Inc()
 
 		if attempt < w.wcfg.RetryAttempts-1 {
+			w.metrics.RetryTotal.Inc()
 			select {
 			case <-ctx.Done():
 				return

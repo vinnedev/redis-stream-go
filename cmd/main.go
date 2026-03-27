@@ -19,6 +19,8 @@ import (
 )
 
 func main() {
+	_ = config.LoadDotEnv() // best-effort local development support
+
 	cfg := config.Load()
 
 	log, err := logger.New(cfg.Log.Level, cfg.Log.JSON)
@@ -60,6 +62,7 @@ func main() {
 
 	workerCtx, cancelWorker := context.WithCancel(ctx)
 
+	worker.StartLagPoller(workerCtx, metrics.ConsumerLag)
 	worker.Start(workerCtx)
 
 	go func() {

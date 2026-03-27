@@ -1,0 +1,295 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: redis-stream-go
+    folder: Redis Stream
+    interval: 1m
+    rules:
+
+      - uid: alert-app-down
+        title: App Down
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              expr: up{job="redis-stream-go"}
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: C
+            datasourceUid: "__expr__"
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              type: threshold
+              refId: C
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [1]
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "redis-stream-go is down"
+          description: "The application has been unreachable for more than 1 minute."
+
+      - uid: alert-high-error-rate
+        title: High Consume Error Rate
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              expr: "rate(stream_consume_errors_total[5m]) / clamp_min(rate(stream_consumed_total[5m]) + rate(stream_consume_errors_total[5m]), 0.001) * 100"
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: C
+            datasourceUid: "__expr__"
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              type: threshold
+              refId: C
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [5]
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+        noDataState: NoData
+        execErrState: Error
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Consume error rate above 5%"
+          description: "Error rate is above 5% over the last 5 minutes."
+
+      - uid: alert-dlq-spike
+        title: Dead Letter Queue Spike
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              expr: "rate(stream_dead_lettered_total[5m])"
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: C
+            datasourceUid: "__expr__"
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              type: threshold
+              refId: C
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+        noDataState: NoData
+        execErrState: Error
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Messages are being dead-lettered"
+          description: "Dead letter rate is above 0 msg/s over the last 5 minutes."
+
+      - uid: alert-consumer-lag
+        title: Consumer Lag High
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              expr: "stream_consumer_lag"
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: C
+            datasourceUid: "__expr__"
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              type: threshold
+              refId: C
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [1000]
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+        noDataState: NoData
+        execErrState: Error
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Consumer lag exceeds 1000 messages"
+          description: "Stream backlog has more than 1000 pending messages."
+
+      - uid: alert-circuit-breaker-open
+        title: Circuit Breaker Open
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              expr: "stream_circuit_breaker_state"
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: C
+            datasourceUid: "__expr__"
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              type: threshold
+              refId: C
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+        noDataState: NoData
+        execErrState: Error
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Publisher circuit breaker is open"
+          description: "Circuit breaker state is non-zero (1=open, 2=half-open). Redis may be unreachable."
+
+      - uid: alert-redis-down
+        title: Redis Down
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              expr: "redis_up"
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: C
+            datasourceUid: "__expr__"
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              type: threshold
+              refId: C
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [1]
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is unreachable"
+          description: "Redis exporter reports redis_up=0 for more than 1 minute."
+
+      - uid: alert-p99-latency
+        title: P99 Processing Latency High
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              expr: "histogram_quantile(0.99, rate(stream_processing_duration_seconds_bucket[5m]))"
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: C
+            datasourceUid: "__expr__"
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              type: threshold
+              refId: C
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [1]
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+        noDataState: NoData
+        execErrState: Error
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P99 processing latency exceeds 1s"
+          description: "P99 latency is above 1s over the last 5 minutes."

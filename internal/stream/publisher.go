@@ -46,6 +46,7 @@ func (p *Publisher) Publish(ctx context.Context, values map[string]any) error {
 		}
 
 		if err := p.breaker.Allow(); err != nil {
+			p.metrics.CircuitBreakerState.Set(1)
 			p.metrics.PublishErrors.Inc()
 			return err
 		}
@@ -63,11 +64,13 @@ func (p *Publisher) Publish(ctx context.Context, values map[string]any) error {
 
 		if err == nil {
 			p.breaker.Success()
+			p.metrics.CircuitBreakerState.Set(0)
 			p.metrics.Published.Inc()
 			return nil
 		}
 
 		p.breaker.Failure()
+		p.metrics.CircuitBreakerState.Set(2)
 		p.metrics.PublishErrors.Inc()
 
 		if attempt < maxAttempts-1 {

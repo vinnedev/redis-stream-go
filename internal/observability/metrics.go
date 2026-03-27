@@ -6,14 +6,17 @@ import (
 )
 
 type Metrics struct {
-	Published          prometheus.Counter
-	PublishErrors      prometheus.Counter
-	PublishDuration    prometheus.Histogram
-	Consumed           prometheus.Counter
-	ConsumeErrors      prometheus.Counter
-	DeadLettered       prometheus.Counter
-	ProcessingDuration prometheus.Histogram
-	ActiveWorkers      prometheus.Gauge
+	Published           prometheus.Counter
+	PublishErrors       prometheus.Counter
+	PublishDuration     prometheus.Histogram
+	Consumed            prometheus.Counter
+	ConsumeErrors       prometheus.Counter
+	ConsumerLag         prometheus.Gauge
+	RetryTotal          prometheus.Counter
+	CircuitBreakerState prometheus.Gauge
+	DeadLettered        prometheus.Counter
+	ProcessingDuration  prometheus.Histogram
+	ActiveWorkers       prometheus.Gauge
 }
 
 func NewMetrics(reg prometheus.Registerer) *Metrics {
@@ -40,6 +43,18 @@ func NewMetrics(reg prometheus.Registerer) *Metrics {
 		ConsumeErrors: factory.NewCounter(prometheus.CounterOpts{
 			Name: "stream_consume_errors_total",
 			Help: "Total number of consume errors.",
+		}),
+		ConsumerLag: factory.NewGauge(prometheus.GaugeOpts{
+			Name: "stream_consumer_lag",
+			Help: "Approximate number of pending messages in the stream.",
+		}),
+		RetryTotal: factory.NewCounter(prometheus.CounterOpts{
+			Name: "stream_retry_total",
+			Help: "Total number of message processing retry attempts.",
+		}),
+		CircuitBreakerState: factory.NewGauge(prometheus.GaugeOpts{
+			Name: "stream_circuit_breaker_state",
+			Help: "Current circuit breaker state: 0=closed 1=open 2=half-open.",
 		}),
 		DeadLettered: factory.NewCounter(prometheus.CounterOpts{
 			Name: "stream_dead_lettered_total",
