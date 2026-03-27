@@ -9,9 +9,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/redis/go-redis/v9"
-	"redis-stream-go/internal/config"
-	"redis-stream-go/internal/observability"
-	"redis-stream-go/internal/stream"
+	"github.com/vinnedev/redis-stream-go/internal/config"
+	"github.com/vinnedev/redis-stream-go/internal/observability"
+	"github.com/vinnedev/redis-stream-go/internal/stream"
 )
 
 func newTestRDB(t *testing.T, addr string) *redis.Client {
@@ -31,7 +31,7 @@ func TestPublishSuccessIncrementsMetric(t *testing.T) {
 	_, metrics := newTestMetrics(t)
 
 	cfg := config.StreamConfig{Name: "test-stream", MaxLen: 1000}
-	wcfg := config.WorkerConfig{}
+	wcfg := config.WorkerConfig{RetryAttempts: 3, RetryBaseDelay: 10 * time.Millisecond, RetryMaxDelay: 100 * time.Millisecond}
 	pub := stream.NewPublisher(rdb, cfg, wcfg, metrics)
 
 	if err := pub.Publish(context.Background(), map[string]any{"key": "value"}); err != nil {
@@ -52,7 +52,7 @@ func TestPublishFailsWhenCircuitBreakerOpen(t *testing.T) {
 	_, metrics := newTestMetrics(t)
 
 	cfg := config.StreamConfig{Name: "test-stream", MaxLen: 1000}
-	wcfg := config.WorkerConfig{}
+	wcfg := config.WorkerConfig{RetryAttempts: 3, RetryBaseDelay: 10 * time.Millisecond, RetryMaxDelay: 100 * time.Millisecond}
 	pub := stream.NewPublisher(rdb, cfg, wcfg, metrics)
 
 	for i := 0; i < 10; i++ {
@@ -70,7 +70,7 @@ func TestPublishRespectsContextCancellation(t *testing.T) {
 	_, metrics := newTestMetrics(t)
 
 	cfg := config.StreamConfig{Name: "test-stream", MaxLen: 1000}
-	wcfg := config.WorkerConfig{}
+	wcfg := config.WorkerConfig{RetryAttempts: 3, RetryBaseDelay: 10 * time.Millisecond, RetryMaxDelay: 100 * time.Millisecond}
 	pub := stream.NewPublisher(rdb, cfg, wcfg, metrics)
 
 	ctx, cancel := context.WithCancel(context.Background())

@@ -11,11 +11,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
-	"redis-stream-go/internal/config"
-	"redis-stream-go/internal/health"
-	"redis-stream-go/internal/logger"
-	"redis-stream-go/internal/observability"
-	"redis-stream-go/internal/stream"
+	"github.com/vinnedev/redis-stream-go/internal/config"
+	"github.com/vinnedev/redis-stream-go/internal/health"
+	"github.com/vinnedev/redis-stream-go/internal/logger"
+	"github.com/vinnedev/redis-stream-go/internal/observability"
+	"github.com/vinnedev/redis-stream-go/internal/stream"
 )
 
 func main() {

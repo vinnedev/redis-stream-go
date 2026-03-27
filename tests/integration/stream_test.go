@@ -14,9 +14,9 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
-	"redis-stream-go/internal/config"
-	"redis-stream-go/internal/observability"
-	"redis-stream-go/internal/stream"
+	"github.com/vinnedev/redis-stream-go/internal/config"
+	"github.com/vinnedev/redis-stream-go/internal/observability"
+	"github.com/vinnedev/redis-stream-go/internal/stream"
 )
 
 func startRedis(t *testing.T) string {

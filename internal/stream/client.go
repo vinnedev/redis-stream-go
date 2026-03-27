@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/redis/go-redis/v9"
-	"redis-stream-go/internal/config"
+	"github.com/vinnedev/redis-stream-go/internal/config"
 )
 
 func NewClient(cfg config.RedisConfig) *redis.Client {

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"redis-stream-go/pkg/backoff"
+	"github.com/vinnedev/redis-stream-go/pkg/backoff"
 )
 
 func TestDelayIncreasesWithAttempts(t *testing.T) {

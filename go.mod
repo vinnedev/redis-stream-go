@@ -1,4 +1,4 @@
-module redis-stream-go
+module github.com/vinnedev/redis-stream-go
 
 go 1.26.1
 

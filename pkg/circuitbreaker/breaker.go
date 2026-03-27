@@ -9,12 +9,12 @@ import (
 type State int
 
 const (
-	StateClosed   State = iota
-	StateHalfOpen State = iota
-	StateOpen     State = iota
+	StateClosed   State = iota // 0
+	StateOpen     State = iota // 1
+	StateHalfOpen State = iota // 2
 )
 
-var stateNames = []string{"closed", "half-open", "open"}
+var stateNames = []string{"closed", "open", "half-open"}
 
 func (s State) String() string {
 	if int(s) >= len(stateNames) {

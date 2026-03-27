@@ -14,10 +14,10 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
-	"redis-stream-go/internal/config"
-	"redis-stream-go/internal/logger"
-	"redis-stream-go/internal/observability"
-	"redis-stream-go/internal/stream"
+	"github.com/vinnedev/redis-stream-go/internal/config"
+	"github.com/vinnedev/redis-stream-go/internal/logger"
+	"github.com/vinnedev/redis-stream-go/internal/observability"
+	"github.com/vinnedev/redis-stream-go/internal/stream"
 )
 
 // phaseState is shared between the phase runner and the worker handler.

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"redis-stream-go/pkg/circuitbreaker"
+	"github.com/vinnedev/redis-stream-go/pkg/circuitbreaker"
 )
 
 func TestInitiallyClosedAndAllowsRequests(t *testing.T) {

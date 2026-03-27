@@ -13,6 +13,12 @@ services:
       LOG_JSON: "true"
     ports:
       - "8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
     depends_on:
       redis:
         condition: service_healthy
@@ -60,8 +66,10 @@ services:
     ports:
       - "9090:9090"
     depends_on:
-      - app
-      - redis-exporter
+      app:
+        condition: service_healthy
+      redis-exporter:
+        condition: service_started
     networks:
       - stream-net
 

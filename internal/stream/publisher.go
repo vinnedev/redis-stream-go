@@ -2,18 +2,20 @@ package stream
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/redis/go-redis/v9"
-	"redis-stream-go/internal/config"
-	"redis-stream-go/internal/observability"
-	"redis-stream-go/pkg/backoff"
-	"redis-stream-go/pkg/circuitbreaker"
+	"github.com/vinnedev/redis-stream-go/internal/config"
+	"github.com/vinnedev/redis-stream-go/internal/observability"
+	"github.com/vinnedev/redis-stream-go/pkg/backoff"
+	"github.com/vinnedev/redis-stream-go/pkg/circuitbreaker"
 )
 
 type Publisher struct {
 	rdb     *redis.Client
 	cfg     config.StreamConfig
+	wcfg    config.WorkerConfig
 	breaker *circuitbreaker.Breaker
 	backoff backoff.Config
 	metrics *observability.Metrics
@@ -31,6 +33,7 @@ func NewPublisher(rdb *redis.Client, cfg config.StreamConfig, wcfg config.Worker
 	return &Publisher{
 		rdb:     rdb,
 		cfg:     cfg,
+		wcfg:    wcfg,
 		breaker: circuitbreaker.New(bcfg),
 		backoff: boCfg,
 		metrics: metrics,
@@ -38,15 +41,13 @@ func NewPublisher(rdb *redis.Client, cfg config.StreamConfig, wcfg config.Worker
 }
 
 func (p *Publisher) Publish(ctx context.Context, values map[string]any) error {
-	const maxAttempts = 3
-
-	for attempt := 0; attempt < maxAttempts; attempt++ {
+	for attempt := 0; attempt < p.wcfg.RetryAttempts; attempt++ {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 
 		if err := p.breaker.Allow(); err != nil {
-			p.metrics.CircuitBreakerState.Set(1)
+			p.metrics.CircuitBreakerState.Set(float64(p.breaker.State()))
 			p.metrics.PublishErrors.Inc()
 			return err
 		}
@@ -59,21 +60,20 @@ func (p *Publisher) Publish(ctx context.Context, values map[string]any) error {
 			ID:     "*",
 			Values: values,
 		}).Err()
-		duration := time.Since(start).Seconds()
-		p.metrics.PublishDuration.Observe(duration)
+		p.metrics.PublishDuration.Observe(time.Since(start).Seconds())
 
 		if err == nil {
 			p.breaker.Success()
-			p.metrics.CircuitBreakerState.Set(0)
+			p.metrics.CircuitBreakerState.Set(float64(p.breaker.State()))
 			p.metrics.Published.Inc()
 			return nil
 		}
 
 		p.breaker.Failure()
-		p.metrics.CircuitBreakerState.Set(2)
+		p.metrics.CircuitBreakerState.Set(float64(p.breaker.State()))
 		p.metrics.PublishErrors.Inc()
 
-		if attempt < maxAttempts-1 {
+		if attempt < p.wcfg.RetryAttempts-1 {
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
@@ -82,5 +82,5 @@ func (p *Publisher) Publish(ctx context.Context, values map[string]any) error {
 		}
 	}
 
-	return context.DeadlineExceeded
+	return fmt.Errorf("publish failed after %d attempts", p.wcfg.RetryAttempts)
 }
