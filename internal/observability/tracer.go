@@ -12,7 +12,7 @@ import (
 )
 
 func NewTracer(ctx context.Context, serviceName string) (trace.Tracer, func(context.Context) error, error) {
-	exporter, err := stdouttrace.New(stdouttrace.WithPrettyPrint())
+	exporter, err := stdouttrace.New()
 	if err != nil {
 		return nil, nil, err
 	}

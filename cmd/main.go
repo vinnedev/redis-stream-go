@@ -10,12 +10,12 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.uber.org/zap"
 	"github.com/vinnedev/redis-stream-go/internal/config"
 	"github.com/vinnedev/redis-stream-go/internal/health"
 	"github.com/vinnedev/redis-stream-go/internal/logger"
 	"github.com/vinnedev/redis-stream-go/internal/observability"
 	"github.com/vinnedev/redis-stream-go/internal/stream"
+	"go.uber.org/zap"
 )
 
 func main() {
@@ -58,7 +58,7 @@ func main() {
 	worker := stream.NewWorker(rdb, cfg.Stream, cfg.Worker, handler, metrics)
 
 	metricsHandler := promhttp.HandlerFor(reg, promhttp.HandlerOpts{})
-	healthServer := health.NewServer(cfg.HTTP.Addr, rdb, metricsHandler)
+	healthServer := health.NewServer(cfg.HTTP.Addr, rdb, metricsHandler, log)
 
 	workerCtx, cancelWorker := context.WithCancel(ctx)
 

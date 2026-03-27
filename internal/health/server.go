@@ -8,17 +8,23 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 )
 
 type Server struct {
-	srv *http.Server
-	rdb *redis.Client
+	srv    *http.Server
+	rdb    *redis.Client
+	logger *zap.Logger
 }
 
-func NewServer(addr string, rdb *redis.Client, reg http.Handler) *Server {
+func NewServer(addr string, rdb *redis.Client, reg http.Handler, log *zap.Logger) *Server {
 	mux := http.NewServeMux()
 
-	s := &Server{rdb: rdb}
+	if log == nil {
+		log = zap.NewNop()
+	}
+
+	s := &Server{rdb: rdb, logger: log}
 
 	mux.HandleFunc("GET /health", s.handleHealth)
 	mux.HandleFunc("GET /ready", s.handleReady)
@@ -35,8 +41,8 @@ func NewServer(addr string, rdb *redis.Client, reg http.Handler) *Server {
 	return s
 }
 
-func NewServerWithPrometheus(addr string, rdb *redis.Client) *Server {
-	return NewServer(addr, rdb, promhttp.Handler())
+func NewServerWithPrometheus(addr string, rdb *redis.Client, log *zap.Logger) *Server {
+	return NewServer(addr, rdb, promhttp.Handler(), log)
 }
 
 func (s *Server) Start() error {
@@ -48,19 +54,22 @@ func (s *Server) Shutdown(ctx context.Context) error {
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	s.writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) {
 	if err := s.rdb.Ping(r.Context()).Err(); err != nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "unavailable", "error": err.Error()})
+		s.logger.Warn("readiness check failed", zap.Int("status", http.StatusServiceUnavailable), zap.Error(err))
+		s.writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "unavailable", "error": err.Error()})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ready"})
+	s.writeJSON(w, http.StatusOK, map[string]string{"status": "ready"})
 }
 
-func writeJSON(w http.ResponseWriter, status int, body any) {
+func (s *Server) writeJSON(w http.ResponseWriter, status int, body any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(body)
+	if err := json.NewEncoder(w).Encode(body); err != nil {
+		s.logger.Error("write json response failed", zap.Error(err))
+	}
 }

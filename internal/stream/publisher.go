@@ -7,9 +7,11 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/vinnedev/redis-stream-go/internal/config"
+	"github.com/vinnedev/redis-stream-go/internal/logger"
 	"github.com/vinnedev/redis-stream-go/internal/observability"
 	"github.com/vinnedev/redis-stream-go/pkg/backoff"
 	"github.com/vinnedev/redis-stream-go/pkg/circuitbreaker"
+	"go.uber.org/zap"
 )
 
 type Publisher struct {
@@ -41,6 +43,8 @@ func NewPublisher(rdb *redis.Client, cfg config.StreamConfig, wcfg config.Worker
 }
 
 func (p *Publisher) Publish(ctx context.Context, values map[string]any) error {
+	log := logger.FromContext(ctx)
+
 	for attempt := 0; attempt < p.wcfg.RetryAttempts; attempt++ {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -49,6 +53,7 @@ func (p *Publisher) Publish(ctx context.Context, values map[string]any) error {
 		if err := p.breaker.Allow(); err != nil {
 			p.metrics.CircuitBreakerState.Set(float64(p.breaker.State()))
 			p.metrics.PublishErrors.Inc()
+			log.Error("publish rejected by circuit breaker", zap.Error(err))
 			return err
 		}
 
@@ -72,6 +77,7 @@ func (p *Publisher) Publish(ctx context.Context, values map[string]any) error {
 		p.breaker.Failure()
 		p.metrics.CircuitBreakerState.Set(float64(p.breaker.State()))
 		p.metrics.PublishErrors.Inc()
+		log.Warn("publish attempt failed", zap.Int("attempt", attempt), zap.Error(err))
 
 		if attempt < p.wcfg.RetryAttempts-1 {
 			select {
