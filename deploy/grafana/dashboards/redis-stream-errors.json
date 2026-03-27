@@ -204,7 +204,7 @@
               },
               {
                 "color": "yellow",
-                "value": 0.000001
+                "value": 1e-06
               },
               {
                 "color": "red",
@@ -1639,7 +1639,9 @@
             "uid": "loki"
           },
           "expr": "{service=\"app\"} | json | level=~\"error|warn\"",
-          "legendFormat": ""
+          "legendFormat": "",
+          "direction": "backward",
+          "queryType": "range"
         }
       ]
     },
@@ -1675,7 +1677,9 @@
             "uid": "loki"
           },
           "expr": "{service=\"app\"} |= \"dead letter\"",
-          "legendFormat": ""
+          "legendFormat": "",
+          "direction": "backward",
+          "queryType": "range"
         },
         {
           "refId": "B",
@@ -1684,12 +1688,14 @@
             "uid": "loki"
           },
           "expr": "{service=\"app\"} |= \"handler error\"",
-          "legendFormat": ""
+          "legendFormat": "",
+          "direction": "backward",
+          "queryType": "range"
         }
       ]
     }
   ],
-  "refresh": "10s",
+  "refresh": "30s",
   "schemaVersion": 39,
   "tags": [
     "redis",
